@@ -3,3 +3,4 @@ venv/
 *DS*
 .env
 .env.local
+.vscode/launch.json
