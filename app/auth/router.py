@@ -285,7 +285,7 @@ def auth_signup(body: SignUpRequest):
     )
 
 
-# ---------- Me (protected) ----------
+# ---------- Me (protected endpoint) ----------
 
 
 @router.get("/me", response_model=UserInfo, summary="Current user")
