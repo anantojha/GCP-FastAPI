@@ -24,7 +24,7 @@ from app.auth import oauth
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-# In production store state in Redis/session; here we use in-memory for demo.
+# In production store state in Redis/session; here we use in-memory for demo
 _oauth_states: dict[str, str] = {}  # state -> "google" | "github" | "apple"
 
 
