@@ -16,3 +16,5 @@ This project includes a full auth backend for a login page with:
 1. Copy `.env.example` to `.env` and set OAuth client IDs/secrets and `SECRET_KEY`.
 2. Run: `uvicorn app.main:app --reload`
 3. Open `http://localhost:8000/docs` for interactive API docs.
+
+
