@@ -5,7 +5,7 @@ from pydantic import BaseModel, EmailStr, Field
 class EmailContinueRequest(BaseModel):
     """Body for 'Continue with email' – frontend sends this when user clicks Continue."""
 
-    email: EmailStr = Field(..., description="User's email address")
+    email: str = Field(..., description="Username or email address")
 
 
 class EmailContinueResponse(BaseModel):
@@ -23,9 +23,9 @@ class EmailContinueResponse(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    """Body for email + password login."""
+    """Body for username/email + password login."""
 
-    email: EmailStr = Field(..., description="User's email address")
+    email: str = Field(..., description="Username or email address")
     password: str = Field(..., min_length=1, description="User's password")
 
 
@@ -42,8 +42,10 @@ class UserInfo(BaseModel):
 
     id: str = Field(..., description="Unique user id")
     email: str = Field(..., description="User email")
+    username: str | None = Field(default=None, description="Login username")
     name: str | None = Field(default=None, description="Display name")
     picture: str | None = Field(default=None, description="Avatar URL from OAuth provider")
+    role: str = Field(default="user", description="user or admin")
 
 
 class TokenResponse(BaseModel):

@@ -20,6 +20,10 @@ GOOGLE_SCOPES = "openid email profile"
 
 
 def google_authorize_url(redirect_uri: str, state: str) -> str:
+    if not settings.google_client_id:
+        raise ValueError(
+            "Google OAuth not configured: set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env, then restart the API."
+        )
     params = {
         "client_id": settings.google_client_id,
         "redirect_uri": redirect_uri,
@@ -38,12 +42,12 @@ async def google_exchange_and_get_user(code: str, redirect_uri: str) -> TokenRes
         client_secret=settings.google_client_secret,
         token_endpoint=GOOGLE_TOKEN_URL,
     ) as client:
-        token = await client.fetch_token(
+        await client.fetch_token(
             GOOGLE_TOKEN_URL,
             code=code,
             redirect_uri=redirect_uri,
         )
-        resp = await client.get(GOOGLE_USERINFO_URL, token=token)
+        resp = await client.get(GOOGLE_USERINFO_URL)
         resp.raise_for_status()
         data = resp.json()
     email = data.get("email") or data.get("id") + "@google.oauth"
@@ -55,6 +59,7 @@ async def google_exchange_and_get_user(code: str, redirect_uri: str) -> TokenRes
         email=user["email"],
         name=user.get("name"),
         picture=user.get("picture"),
+        is_admin=user.get("is_admin", False),
     )
     return TokenResponse(
         access_token=access_token,
@@ -75,6 +80,10 @@ GITHUB_EMAILS_URL = "https://api.github.com/user/emails"
 
 
 def github_authorize_url(redirect_uri: str, state: str) -> str:
+    if not settings.github_client_id:
+        raise ValueError(
+            "GitHub OAuth not configured: set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in .env, then restart the API."
+        )
     params = {
         "client_id": settings.github_client_id,
         "redirect_uri": redirect_uri,
@@ -133,6 +142,7 @@ async def github_exchange_and_get_user(code: str, redirect_uri: str) -> TokenRes
             email=user["email"],
             name=user.get("name"),
             picture=user.get("picture"),
+            is_admin=user.get("is_admin", False),
         )
         return TokenResponse(
             access_token=jwt_token,
@@ -223,6 +233,7 @@ async def apple_exchange_and_get_user(code: str, redirect_uri: str, id_token: st
         email=user["email"],
         name=user.get("name"),
         picture=user.get("picture"),
+        is_admin=user.get("is_admin", False),
     )
     return TokenResponse(
         access_token=jwt_token,

@@ -4,3 +4,4 @@ venv/
 .env
 .env.local
 .vscode/launch.json
+.vscode/settings.json

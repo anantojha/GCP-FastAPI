@@ -1,9 +1,18 @@
 """Application settings loaded from environment variables."""
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Always load .env from project root (GCP-FastAPI/), not the process cwd.
+_ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=_ENV_FILE,
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     # App
     app_name: str = "GCP FastAPI"
@@ -31,6 +40,11 @@ class Settings(BaseSettings):
     # Email (optional – for magic links)
     sendgrid_api_key: str = ""
     from_email: str = "noreply@example.com"
+
+    # Built-in admin (re-seeded on each API start; in-memory only)
+    admin_username: str = "admin"
+    admin_password: str = "admin123"
+    admin_email: str = "admin@local"
 
 
 settings = Settings()

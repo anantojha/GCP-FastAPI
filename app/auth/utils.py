@@ -2,23 +2,28 @@
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
+import bcrypt
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 from app.config import settings
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    return bcrypt.checkpw(plain.encode(), hashed.encode())
 
 
-def create_access_token(subject: str, email: str, name: str | None = None, picture: str | None = None) -> str:
+def create_access_token(
+    subject: str,
+    email: str,
+    name: str | None = None,
+    picture: str | None = None,
+    *,
+    is_admin: bool = False,
+) -> str:
     expire = datetime.now(UTC) + timedelta(minutes=settings.access_token_expire_minutes)
     to_encode = {
         "sub": subject,
@@ -27,6 +32,7 @@ def create_access_token(subject: str, email: str, name: str | None = None, pictu
         "iat": datetime.now(UTC),
         "name": name,
         "picture": picture,
+        "role": "admin" if is_admin else "user",
     }
     return jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
 

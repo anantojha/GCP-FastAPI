@@ -13,11 +13,13 @@ from app.schemas.auth import (
     TokenResponse,
     UserInfo,
 )
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_admin, get_current_user
 from app.auth.utils import create_access_token, hash_password, verify_password
 from app.auth.user_store import (
     create_user,
     get_user_by_email,
+    get_user_by_login,
+    list_all_users,
     user_to_info,
 )
 from app.auth import oauth
@@ -26,6 +28,22 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 # In production store state in Redis/session; here we use in-memory for demo.
 _oauth_states: dict[str, str] = {}  # state -> "google" | "github" | "apple"
+
+
+def _token_for_user(user: dict) -> TokenResponse:
+    token = create_access_token(
+        subject=user["id"],
+        email=user["email"],
+        name=user.get("name"),
+        picture=user.get("picture"),
+        is_admin=user.get("is_admin", False),
+    )
+    return TokenResponse(
+        access_token=token,
+        token_type="bearer",
+        expires_in=settings.access_token_expire_minutes * 60,
+        user=user_to_info(user),
+    )
 
 
 def _base_url() -> str:
@@ -206,7 +224,7 @@ def auth_continue(body: EmailContinueRequest):
     - If the user **does not exist**: returns `require_password: false` and `message` suggesting sign up → frontend navigates to sign up or shows sign up form.
     - Optional: backend can send a magic link and return `magic_link_sent: true` instead.
     """
-    user = get_user_by_email(body.email)
+    user = get_user_by_login(body.email)
     if user:
         if user.get("password_hash"):
             return EmailContinueResponse(
@@ -228,30 +246,19 @@ def auth_continue(body: EmailContinueRequest):
 
 @router.post("/login", response_model=TokenResponse, summary="Login with email and password")
 def auth_login(body: LoginRequest):
-    """After user entered password (following Continue), send email + password. Returns JWT and user info."""
-    user = get_user_by_email(body.email)
+    """Login with username or email + password. Returns JWT and user info."""
+    user = get_user_by_login(body.email)
     if not user or not user.get("password_hash"):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
+            detail="Invalid username or password",
         )
     if not verify_password(body.password, user["password_hash"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
+            detail="Invalid username or password",
         )
-    token = create_access_token(
-        subject=user["id"],
-        email=user["email"],
-        name=user.get("name"),
-        picture=user.get("picture"),
-    )
-    return TokenResponse(
-        access_token=token,
-        token_type="bearer",
-        expires_in=settings.access_token_expire_minutes * 60,
-        user=user_to_info(user),
-    )
+    return _token_for_user(user)
 
 
 # ---------- Sign up ----------
@@ -260,6 +267,12 @@ def auth_login(body: LoginRequest):
 @router.post("/signup", response_model=TokenResponse, summary="Sign up")
 def auth_signup(body: SignUpRequest):
     """Create a new account with email and password. Returns JWT and user info (user is logged in)."""
+    email_norm = body.email.strip().lower()
+    if email_norm == settings.admin_email.lower():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This email is reserved.",
+        )
     existing = get_user_by_email(body.email)
     if existing:
         raise HTTPException(
@@ -271,18 +284,7 @@ def auth_signup(body: SignUpRequest):
         password_hash=hash_password(body.password),
         name=body.name,
     )
-    token = create_access_token(
-        subject=user["id"],
-        email=user["email"],
-        name=user.get("name"),
-        picture=user.get("picture"),
-    )
-    return TokenResponse(
-        access_token=token,
-        token_type="bearer",
-        expires_in=settings.access_token_expire_minutes * 60,
-        user=user_to_info(user),
-    )
+    return _token_for_user(user)
 
 
 # ---------- Me (protected endpoint) ----------
@@ -292,3 +294,13 @@ def auth_signup(body: SignUpRequest):
 def auth_me(current_user: UserInfo = Depends(get_current_user)):
     """Return the currently authenticated user. Requires `Authorization: Bearer <token>`."""
     return current_user
+
+
+@router.get("/users", response_model=list[UserInfo], summary="List registered users (admin)")
+def auth_list_users(_admin: UserInfo = Depends(get_current_admin)):
+    """
+    Return all registered users from the in-memory store. Admin only.
+
+    Data is not persisted to disk and is cleared when the API process restarts.
+    """
+    return list_all_users()

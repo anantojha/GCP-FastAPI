@@ -1,12 +1,28 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth.router import router as auth_router
+from app.auth.user_store import ensure_admin_user
+from app.config import settings
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    ensure_admin_user(
+        username=settings.admin_username,
+        password=settings.admin_password,
+        email=settings.admin_email,
+    )
+    yield
+
 
 app = FastAPI(
     title="GCP FastAPI",
     description="API with auth: Google, GitHub, Apple, and email/password. See docs/AUTH_API.md for frontend usage.",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
